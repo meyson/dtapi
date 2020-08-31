@@ -1,4 +1,9 @@
-version: 2.0
+version: 2.1
+
+orbs:
+  gcp-gcr: circleci/gcp-gcr@0.8.0
+  gcp-gke: circleci/gcp-gke@1.1.0
+
 jobs:
   build_artifact:
     docker:
@@ -6,18 +11,18 @@ jobs:
     resource_class: small
     steps:
       - checkout
-  
+
       - run: git clone --depth 1 https://github.com/koseven/koseven.git --single-branch
-      - run: 
+      - run:
           name: Build dtapi
           command: |
             ARTIFACT="artifact"
             mkdir "$ARTIFACT"
-            
+
             cp -r koseven/modules "$ARTIFACT"
             cp -r koseven/system "$ARTIFACT"
             cp koseven/public/index.php "$ARTIFACT"
-      
+
             cp -r application "$ARTIFACT"
             cp .htaccess "$ARTIFACT"
             mkdir -p "$ARTIFACT/application/cache/"
@@ -27,8 +32,78 @@ jobs:
       - store_artifacts: # store the uberjar as an artifact
           path: dtapi_be_artifact.tar.gz
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - "artifact"
+            - "docker"
+
+  build-and-push-image:
+    docker:
+      - image: cimg/base:2020.01
+    resource_class: small
+    environment:
+      TEST_VAR: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+    steps:
+      - setup_remote_docker 
+      - attach_workspace:
+          at: ~/project/
+      - gcp-gcr/gcr-auth
+      # build and push Docker image
+      - gcp-gcr/build-image:
+          dockerfile: "docker/Dockerfile"
+          image: dtapi-be
+          registry-url: eu.gcr.io
+          tag: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+
+      - gcp-gcr/push-image:
+          digest-path: /tmp/digest.txt
+          image: dtapi-be
+          registry-url: eu.gcr.io
+          tag: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+      
+      - gcp-gcr/tag-image:
+          image: dtapi-be
+          registry-url: eu.gcr.io
+          source-tag: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+          target-tag: latest
+      # The path to save the RepoDigest of the pushed image
+      - run:
+          name: sha256 Digest 
+          command: |
+            echo "Digest is: $(</tmp/digest.txt)"
+
+  deploy:
+    docker:
+      - image: cimg/base:2020.01
+    resource_class: small
+    steps:
+      - run: echo $TEST_VAR
+#    # Install `gcloud` and `kubectl` if not already installed.
+#    # Initialize the `gcloud` CLI.
+#    - gcp-gke/install
+#    - gcp-gke/update-kubeconfig-with-credentials:
+#    # TODO ENV
+#        cluster: cluster-1
+#        perform-login: true
+#         # Update a deployment Docker image.
+#    - gcp-gke/rollout-image:
+#        cluster: cluster-1
+#        deployment: dtapi-be
+#        container: dtapi-be
+#        image: gcr.io/trial-demo-dev/trial-demo-dev
+#        tag: v3 # change version when updating
+    
 workflows:
-  version: 2
   build:
     jobs:
       - build_artifact
+      - build-and-push-image:
+          context: dtapi
+          requires:
+            - build_artifact
+      
+      - deploy:
+          context: dtapi
+          requires:
+            - build-and-push-image 
