@@ -1,4 +1,8 @@
-version: 2.0
+version: 2.1
+
+orbs:
+  gcp-gcr: circleci/gcp-gcr@0.8.0
+
 jobs:
   build_artifact:
     docker:
@@ -6,18 +10,18 @@ jobs:
     resource_class: small
     steps:
       - checkout
-  
+
       - run: git clone --depth 1 https://github.com/koseven/koseven.git --single-branch
-      - run: 
+      - run:
           name: Build dtapi
           command: |
             ARTIFACT="artifact"
             mkdir "$ARTIFACT"
-            
+
             cp -r koseven/modules "$ARTIFACT"
             cp -r koseven/system "$ARTIFACT"
             cp koseven/public/index.php "$ARTIFACT"
-      
+
             cp -r application "$ARTIFACT"
             cp .htaccess "$ARTIFACT"
             mkdir -p "$ARTIFACT/application/cache/"
@@ -27,8 +31,37 @@ jobs:
       - store_artifacts: # store the uberjar as an artifact
           path: dtapi_be_artifact.tar.gz
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - "artifact"
+            - "docker"
+
+  build_container:
+    executor: gcp-gcr/default
+    working_directory: ~/project
+    steps:
+      - attach_workspace:
+          at: ~/project/
+      - gcp-gcr/gcr-auth
+      # build and push Docker image
+      - gcp-gcr/build-image:
+          dockerfile: "docker/Dockerfile"
+          image: dtapi
+          registry-url: eu.gcr.io
+      - gcp-gcr/push-image:
+          digest-path: /tmp/digest.txt
+          image: dtapi
+          registry-url: eu.gcr.io
+      # The path to save the RepoDigest of the pushed image
+      - run:
+          command: |
+            echo "Digest is: $(</tmp/digest.txt)"
+
 workflows:
-  version: 2
   build:
     jobs:
       - build_artifact
+      - build_container:
+          requires:
+            - build_artifact
