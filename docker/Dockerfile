@@ -8,7 +8,7 @@ RUN docker-php-ext-install pdo_mysql \
   && a2enmod rewrite 
 
 # copy source files
-COPY --chown="www-data:www-data" ./artifact /var/www/html/
+COPY --chown="www-data:www-data" ./artifact /var/www/html/api
 
 COPY ./docker/docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["bash", "docker-entrypoint.sh"]

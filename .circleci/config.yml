@@ -38,13 +38,16 @@ jobs:
             - "docker"
 
   build_container:
-    executor: gcp-gcr/default
-    working_directory: ~/project
+    docker:
+      - image: cimg/base:2020.01
+    resource_class: small
     steps:
+      - setup_remote_docker 
       - attach_workspace:
           at: ~/project/
       - gcp-gcr/gcr-auth
       # build and push Docker image
+      # TODO tags
       - gcp-gcr/build-image:
           dockerfile: "docker/Dockerfile"
           image: dtapi
