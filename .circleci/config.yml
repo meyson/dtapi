@@ -47,14 +47,13 @@ jobs:
           at: ~/project/
       - gcp-gcr/gcr-auth
       # build and push Docker image
-      # TODO tags
       - gcp-gcr/build-image:
           dockerfile: "docker/Dockerfile"
-          image: dtapi
+          image: dtapi-be
           registry-url: eu.gcr.io
       - gcp-gcr/push-image:
           digest-path: /tmp/digest.txt
-          image: dtapi
+          image: dtapi-be
           registry-url: eu.gcr.io
       # The path to save the RepoDigest of the pushed image
       - run:
@@ -66,5 +65,6 @@ workflows:
     jobs:
       - build_artifact
       - build_container:
+          context: dtapi
           requires:
             - build_artifact
