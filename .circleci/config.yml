@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   gcp-gcr: circleci/gcp-gcr@0.8.0
+  gcp-gke: circleci/gcp-gke@1.1.0
 
 jobs:
   build_artifact:
@@ -37,10 +38,12 @@ jobs:
             - "artifact"
             - "docker"
 
-  build_container:
+  build-and-push-image:
     docker:
       - image: cimg/base:2020.01
     resource_class: small
+    environment:
+      TEST_VAR: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
     steps:
       - setup_remote_docker 
       - attach_workspace:
@@ -51,20 +54,56 @@ jobs:
           dockerfile: "docker/Dockerfile"
           image: dtapi-be
           registry-url: eu.gcr.io
+          tag: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+
       - gcp-gcr/push-image:
           digest-path: /tmp/digest.txt
           image: dtapi-be
           registry-url: eu.gcr.io
+          tag: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+      
+      - gcp-gcr/tag-image:
+          image: dtapi-be
+          registry-url: eu.gcr.io
+          source-tag: ${CIRCLE_SHA1:0:7}.$CIRCLE_BUILD_NUM
+          target-tag: latest
       # The path to save the RepoDigest of the pushed image
       - run:
+          name: sha256 Digest 
           command: |
             echo "Digest is: $(</tmp/digest.txt)"
 
+  deploy:
+    docker:
+      - image: cimg/base:2020.01
+    resource_class: small
+    steps:
+      - run: echo $TEST_VAR
+#    # Install `gcloud` and `kubectl` if not already installed.
+#    # Initialize the `gcloud` CLI.
+#    - gcp-gke/install
+#    - gcp-gke/update-kubeconfig-with-credentials:
+#    # TODO ENV
+#        cluster: cluster-1
+#        perform-login: true
+#         # Update a deployment Docker image.
+#    - gcp-gke/rollout-image:
+#        cluster: cluster-1
+#        deployment: dtapi-be
+#        container: dtapi-be
+#        image: gcr.io/trial-demo-dev/trial-demo-dev
+#        tag: v3 # change version when updating
+    
 workflows:
   build:
     jobs:
       - build_artifact
-      - build_container:
+      - build-and-push-image:
           context: dtapi
           requires:
             - build_artifact
+      
+      - deploy:
+          context: dtapi
+          requires:
+            - build-and-push-image 
