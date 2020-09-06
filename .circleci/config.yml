@@ -1,11 +1,12 @@
 version: 2.1
 
 orbs:
+  gcp-cli: circleci/gcp-cli@1.8.4
   gcp-gcr: circleci/gcp-gcr@0.8.0
   gcp-gke: circleci/gcp-gke@1.1.0
 
 jobs:
-  build_artifact:
+  build-artifact:
     docker:
       - image: cimg/base:2020.01
     resource_class: small
@@ -28,38 +29,34 @@ jobs:
             mkdir -p "$ARTIFACT/application/cache/"
             mkdir -p "$ARTIFACT/application/logs/"
             tar -czf dtapi_be_artifact.tar.gz -C "./$ARTIFACT" .
-
-      - store_artifacts: # store the uberjar as an artifact
+      - store_artifacts:
           path: dtapi_be_artifact.tar.gz
-
       - persist_to_workspace:
           root: .
           paths:
             - "artifact"
             - "docker"
-
   build-and-push-image:
     docker:
       - image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
     resource_class: small
     steps:
-      - setup_remote_docker 
+      - setup_remote_docker
       - attach_workspace:
           at: ~/project/
       - gcp-gcr/gcr-auth
-      # build and push Docker image
       - gcp-gcr/build-image:
           dockerfile: "docker/Dockerfile"
           image: dtapi-be
           registry-url: eu.gcr.io
           tag: ${CIRCLE_SHA1:0:7}
-
+      # Push and tag docker image according to commit SHA1 hash 
       - gcp-gcr/push-image:
           digest-path: /tmp/digest.txt
           image: dtapi-be
           registry-url: eu.gcr.io
           tag: ${CIRCLE_SHA1:0:7}
-      
+      # Tag pusshed image as latest
       - gcp-gcr/tag-image:
           image: dtapi-be
           registry-url: eu.gcr.io
@@ -67,7 +64,7 @@ jobs:
           target-tag: latest
       # The path to save the RepoDigest of the pushed image
       - run:
-          name: sha256 Digest 
+          name: sha256 Digest
           command: |
             echo "Digest is: $(</tmp/digest.txt)"
 
@@ -75,27 +72,48 @@ jobs:
     docker:
       - image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
     resource_class: small
+    parameters:
+      gcloud-service-key:
+        type: env_var_name
+        default: GCLOUD_SERVICE_KEY
+        description: The gcloud service key
+      google-project-id:
+        type: env_var_name
+        default: GOOGLE_PROJECT_ID
+        description: >
+          Environment variable name for the Google project ID to connect with
+          via the gcloud CLI
+      google-compute-zone:
+        type: env_var_name
+        default: GOOGLE_COMPUTE_ZONE
+        description: >
+          The Google compute zone to connect with via the gcloud CLI
     steps:
-   
-    - gcp-gcr/gcr-auth
-    # Update a deployment Docker image.
-    - gcp-gke/rollout-image:
-        cluster: cluster-1
-        deployment: $GCP_BE_DEPLOYMENT
-        container: $GCP_BE_CONTAINER
-        image: eu.gcr.io/$GOOGLE_PROJECT_ID/dtapi-be
-        tag: ${CIRCLE_SHA1:0:7}
-    
+      # gcloud login
+      - gcp-cli/initialize:
+          google-project-id: <<parameters.google-project-id>>
+          google-compute-zone: <<parameters.google-compute-zone>>
+          gcloud-service-key: <<parameters.gcloud-service-key>>
+      # Update a deployment Docker image.
+      - gcp-gke/rollout-image:
+          cluster: $GCP_CLUSTER
+          deployment: $GCP_BE_DEPLOYMENT
+          container: $GCP_BE_CONTAINER
+          image: eu.gcr.io/$GOOGLE_PROJECT_ID/dtapi-be
+          tag: ${CIRCLE_SHA1:0:7}
+
+# TODO 
+# only deploy master commits
+# try and check pull requests
 workflows:
   build:
     jobs:
-      - build_artifact
+      - build-artifact
       - build-and-push-image:
           context: dtapi
           requires:
-            - build_artifact
-      
+            - build-artifact
       - deploy:
           context: dtapi
           requires:
-            - build-and-push-image 
+            - build-and-push-image
