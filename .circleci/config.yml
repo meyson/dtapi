@@ -102,9 +102,6 @@ jobs:
           image: eu.gcr.io/$GOOGLE_PROJECT_ID/dtapi-be
           tag: ${CIRCLE_SHA1:0:7}
 
-# TODO 
-# only deploy master commits
-# try and check pull requests
 workflows:
   build:
     jobs:
@@ -117,3 +114,7 @@ workflows:
           context: dtapi
           requires:
             - build-and-push-image
+          filters:
+            branches:
+              only:
+                - master
