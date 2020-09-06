@@ -40,7 +40,7 @@ jobs:
 
   build-and-push-image:
     docker:
-      - image: cimg/base:2020.01
+      - image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
     resource_class: small
     steps:
       - setup_remote_docker 
