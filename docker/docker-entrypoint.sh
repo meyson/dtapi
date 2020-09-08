@@ -9,6 +9,4 @@ sed -i \
   -e "s|'password'   => 'dtapi'|'password'   => '$MYSQL_PASSWORD'|g" \
   "$APP/application/config/database.php"
 
-# The GKE Ingress controller won't work without index.html in root directory
-touch "/var/www/html/index.html"
 exec "$@"
