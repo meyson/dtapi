@@ -38,7 +38,7 @@ jobs:
             - "docker"
   build-and-push-image:
     docker:
-      - image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
+      - image: cimg/base:2020.01
     resource_class: small
     steps:
       - setup_remote_docker
@@ -70,7 +70,7 @@ jobs:
 
   deploy:
     docker:
-      - image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
+      - image: cimg/base:2020.01
     resource_class: small
     parameters:
       gcloud-service-key:
@@ -89,6 +89,7 @@ jobs:
         description: >
           The Google compute zone to connect with via the gcloud CLI
     steps:
+      - gcp-gke/install
       # gcloud login
       - gcp-cli/initialize:
           google-project-id: <<parameters.google-project-id>>
