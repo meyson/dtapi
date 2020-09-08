@@ -97,8 +97,8 @@ jobs:
       # Update a deployment Docker image.
       - gcp-gke/rollout-image:
           cluster: $GCP_CLUSTER
-          deployment: $GCP_BE_DEPLOYMENT
-          container: $GCP_BE_CONTAINER
+          deployment: $GCP_K8_DEPLOYMENT
+          container: $GCP_K8_CONTAINER
           image: eu.gcr.io/$GOOGLE_PROJECT_ID/dtapi-be
           tag: ${CIRCLE_SHA1:0:7}
 
