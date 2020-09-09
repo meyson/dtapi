@@ -6,7 +6,7 @@ orbs:
   gcp-gke: circleci/gcp-gke@1.1.0
 
 commands:
-  # A slightly modified version of the official gcp-gke orb, the only difference is
+  # A slightly modified version of rollout-image command from the official gcp-gke orb, the only difference is
   # it takes two additional parameters perform-login and install-kubectl.
   # Original: https://github.com/CircleCI-Public/gcp-gke-orb/blob/master/src/commands/rollout-image.yml
   rollout-image:
@@ -43,8 +43,9 @@ commands:
         default: ""
       dry-run:
         default: none
-        description: |
-          Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.
+        description: >
+          Must be "none", "server", or "client". If client strategy, only print the object that would be sent,
+          without sending it. If server strategy, submit server-side request without persisting the resource.
         type: enum
         enum: [ "none", "server", "client" ]
     steps:
@@ -69,7 +70,6 @@ jobs:
     resource_class: small
     steps:
       - checkout
-
       - run: git clone --depth 1 https://github.com/koseven/koseven.git --single-branch
       - run:
           name: Build dtapi
@@ -143,11 +143,13 @@ jobs:
 workflows:
   build:
     jobs:
+      # build and push every commit
       - build-artifact
       - build-and-push-image:
           context: dtapi
           requires:
             - build-artifact
+      # Only deploy on the master branch
       - deploy:
           context: dtapi
           requires:
