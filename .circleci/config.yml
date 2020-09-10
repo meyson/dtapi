@@ -149,6 +149,10 @@ workflows:
           context: dtapi
           requires:
             - build-artifact
+          filters:
+            branches:
+              only:
+                - master
       # Only deploy on the master branch
       - deploy:
           context: dtapi
